@@ -1,0 +1,6 @@
+# Training configuration
+learning_rate: 0.001
+num_epochs: 50
+batch_size: 32
+shuffle_train: true
+model_save_path: 'best_model.pth' 

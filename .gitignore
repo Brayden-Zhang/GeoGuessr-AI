@@ -27,3 +27,7 @@ logs/
 
 # Dataset
 dataset/
+image_samples/
+interface/
+model/configs
+build_dataset.py

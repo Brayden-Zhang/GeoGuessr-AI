@@ -5,7 +5,8 @@ import pandas as pd
 import os
 from PIL import Image
 from tqdm import tqdm
-# from build_dataset import dataset_path
+
+
 from get_images import path
 class GeoGuessrDataset(Dataset):
     def __init__(self, data_dir, transform=None):
@@ -70,7 +71,7 @@ train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-# print("Loading training data...")
-# for batch in tqdm(train_loader, desc="Training batches"):
-#     images, coords = batch
-#     pass
+print("Loading training data...")
+for batch in tqdm(train_loader, desc="Training batches"):
+    images, coords = batch
+    pass

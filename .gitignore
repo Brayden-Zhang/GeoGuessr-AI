@@ -31,3 +31,9 @@ image_samples/
 interface/
 model/configs
 build_dataset.py
+
+runs/
+colab_training.ipynb
+
+# Kaggle
+kaggle.json

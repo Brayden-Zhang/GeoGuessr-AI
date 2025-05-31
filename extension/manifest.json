@@ -9,7 +9,8 @@
     "storage"
   ],
   "host_permissions": [
-    "https://www.geoguessr.com/*"
+    "https://www.geoguessr.com/*",
+    "http://localhost:5000/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -34,5 +35,14 @@
       "resources": ["model/*"],
       "matches": ["https://www.geoguessr.com/*"]
     }
-  ]
+  ],
+  "commands": {
+    "trigger_prediction": {
+      "suggested_key": {
+        "default": "Alt+G",
+        "mac": "Alt+G"
+      },
+      "description": "Trigger GeoGuessr AI prediction"
+    }
+  }
 } 

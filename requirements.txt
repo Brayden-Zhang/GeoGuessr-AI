@@ -13,3 +13,5 @@ tensorflow>=2.12.0
 tensorflowjs>=4.10.0
 onnx>=1.14.0
 onnx-tf>=1.14.0
+Flask>=2.0.0 # Added for API server
+Flask-CORS>=3.0.0 # Added for API server

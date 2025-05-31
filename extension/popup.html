@@ -58,6 +58,38 @@
       color: #666;
       margin-top: 5px;
     }
+    #history-section {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #ddd;
+    }
+    #history-section h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 16px;
+      color: #333;
+      text-align: center;
+    }
+    #history-list {
+      list-style-type: none;
+      padding-left: 0;
+      max-height: 150px; /* Limit height and make scrollable if needed */
+      overflow-y: auto;
+    }
+    #history-list li {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      font-size: 12px;
+      color: #555;
+    }
+    #history-list li:last-child {
+      border-bottom: none;
+    }
+    #no-history {
+      text-align: center;
+      color: #888;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -72,6 +104,13 @@
       <p>This may take a few seconds</p>
     </div>
     <div id="prediction"></div>
+
+    <div id="history-section">
+      <h3>Prediction History:</h3>
+      <ul id="history-list">
+        <li id="no-history">No predictions yet.</li>
+      </ul>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>

@@ -1,111 +1,103 @@
-// Load ONNX Runtime
-let session = null;
-let classNames = null;
-let isModelLoading = false;
+// background.js
 
-// Initialize the model
-async function initModel() {
-  if (isModelLoading) {
-    return;
+// Listen for keyboard shortcut command
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === "trigger_prediction") {
+    console.log("trigger_prediction command received");
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.id) {
+        // Check if the tab is a GeoGuessr tab before sending the message
+        if (tab.url && tab.url.startsWith("https://www.geoguessr.com/")) {
+          chrome.tabs.sendMessage(tab.id, { action: 'captureScreen' }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error('Error sending captureScreen message from command listener:', chrome.runtime.lastError.message);
+              // Potentially, try to notify the user via an alert on the page if context permits,
+              // or log to a storage area that the popup could read.
+              // For now, just logging.
+            } else {
+              // Response from content script (prediction details or error)
+              console.log('Prediction triggered by shortcut, content script response:', response);
+              // The content script handles its own UI (overlay).
+              // The popup, if open, would independently trigger and update.
+              // If response contains an error, it's already been handled by content.js for overlay
+            }
+          });
+        } else {
+          console.log("Not a GeoGuessr tab. Command 'trigger_prediction' ignored.");
+          // Optionally, provide feedback to the user if possible (e.g., a brief notification)
+          // This is hard from a service worker without specific notification permissions/setup.
+        }
+      } else {
+        console.error('No active tab found to send command to.');
+      }
+    } catch (e) {
+      console.error('Error in command listener:', e);
+    }
   }
-  
-  isModelLoading = true;
-  try {
-    // Load the ONNX model
-    session = await ort.InferenceSession.create(chrome.runtime.getURL('model/model.onnx'));
-    
-    // Load class names
-    const response = await fetch(chrome.runtime.getURL('model/class_names.json'));
-    classNames = await response.json();
-    
-    console.log('Model loaded successfully');
-    console.log(`Loaded ${classNames.length} country classes`);
-  } catch (error) {
-    console.error('Error loading model:', error);
-    session = null;
-    classNames = null;
-  } finally {
-    isModelLoading = false;
-  }
-}
+});
 
-// Initialize the model when the extension starts
-initModel();
-
-// Listen for messages from content script
+// Listen for messages from content script (e.g., when popup initiates capture)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'predictCountry') {
     predictCountry(request.imageData)
       .then(result => sendResponse(result))
-      .catch(error => sendResponse({ error: error.message }));
+      .catch(error => {
+        console.error('Error in predictCountry message listener:', error);
+        sendResponse({ error: error.message });
+      });
     return true; // Required for async response
   }
 });
 
 async function predictCountry(imageData) {
+  console.log('Received image data for prediction in background.js');
   try {
-    // Ensure model is loaded
-    if (!session || !classNames) {
-      await initModel();
-      if (!session || !classNames) {
-        throw new Error('Failed to load model');
-      }
+    const response = await fetch('http://localhost:5000/predict', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ image_data: imageData }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Server error: ${response.status} ${response.statusText}. Details: ${errorText}`);
+      throw new Error(`Server error: ${response.status} ${response.statusText}. Details: ${errorText}`);
     }
 
-    // Convert base64 image to tensor
-    const img = await loadImage(imageData);
-    const tensor = preprocessImage(img);
+    const data = await response.json();
+    console.log('Prediction received from backend:', data);
+    
+    if (data.error) {
+        console.error('Backend returned an error:', data.error);
+        throw new Error(data.error); // This will be caught by the catch block below
+    }
 
-    // Run inference
-    const results = await session.run({ input: tensor });
-    const predictions = results.output.data;
-    
-    // Get the index of the highest probability
-    const maxIndex = predictions.indexOf(Math.max(...predictions));
-    const confidence = predictions[maxIndex];
-    
-    return {
-      prediction: classNames[maxIndex],
-      confidence: confidence
-    };
-  } catch (error) {
-    console.error('Error in predictCountry:', error);
-    throw error;
+    // If no error in data, proceed to save to history
+    try {
+      const maxHistoryItems = 5;
+      let { history = [] } = await chrome.storage.local.get('history');
+      const newItem = {
+        prediction: data.prediction,
+        confidence: data.confidence,
+        timestamp: new Date().toISOString()
+      };
+      history.unshift(newItem);
+      history = history.slice(0, maxHistoryItems);
+      await chrome.storage.local.set({ history });
+      console.log('Prediction history updated:', history);
+    } catch (storageError) {
+      console.error('Error saving prediction to history:', storageError);
+      // Don't let storage error stop returning the prediction
+    }
+
+    return data; // Should be {'prediction': 'SomeCountry', 'confidence': 0.95}
+
+  } catch (error) { // Catches errors from fetch, response.json(), or data.error throw
+    console.error('Error in predictCountry function:', error);
+    // Return an error object compatible with how the popup expects it
+    return { error: error.message };
   }
 }
-
-// Helper function to load image from base64
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
-// Helper function to preprocess image
-function preprocessImage(img) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 224;
-  canvas.height = 224;
-  const ctx = canvas.getContext('2d');
-  
-  // Draw and resize image
-  ctx.drawImage(img, 0, 0, 224, 224);
-  
-  // Get image data
-  const imageData = ctx.getImageData(0, 0, 224, 224);
-  const data = imageData.data;
-  
-  // Convert to float32 array and normalize
-  const tensor = new Float32Array(1 * 3 * 224 * 224);
-  for (let i = 0; i < data.length / 4; i++) {
-    tensor[i] = data[i * 4] / 255.0; // R
-    tensor[i + 224 * 224] = data[i * 4 + 1] / 255.0; // G
-    tensor[i + 2 * 224 * 224] = data[i * 4 + 2] / 255.0; // B
-  }
-  
-  return new ort.Tensor('float32', tensor, [1, 3, 224, 224]);
-} 
